@@ -178,6 +178,7 @@ return [
         App\Providers\RouteServiceProvider::class,
 
         Spatie\SlashCommand\SlashCommandServiceProvider::class,
+        \App\Providers\ChallongeHttpClientProvider::class,
 
     ],
 
