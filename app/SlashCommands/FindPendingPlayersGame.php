@@ -3,6 +3,7 @@ namespace App\SlashCommands;
 
 use App\Participant;
 use Spatie\SlashCommand\Attachment;
+use Spatie\SlashCommand\AttachmentField;
 use Spatie\SlashCommand\Handlers\BaseHandler;
 use Spatie\SlashCommand\Request;
 use Spatie\SlashCommand\Response;
@@ -12,7 +13,7 @@ class FindPendingPlayersGame extends BaseHandler
 
     protected $signature = '* find game : The command you want information about}';
 
-    protected $description = 'List pending round id for provided participants';
+    protected $description = 'List games between provided participants';
 
 
     /**
@@ -75,11 +76,7 @@ class FindPendingPlayersGame extends BaseHandler
         $response = app('ChallongeHttpClient')->get( $url);
         $games = collect(json_decode($response->getBody()->getContents(), 1));
 
-        $filteredGame = $games->filter(function($item) use ($secondParticipant){
-            if ($item['match']['state'] == 'complete'){
-                return false;
-            }
-
+        $filteredGames = $games->filter(function($item) use ($secondParticipant){
             if ($item['match']['player2_id'] == $secondParticipant->challonge_id){
                 return true;
             }
@@ -87,15 +84,34 @@ class FindPendingPlayersGame extends BaseHandler
             if ($item['match']['player1_id'] == $secondParticipant->challonge_id){
                 return true;
             }
-        })->first();
-        if(empty($filteredGame)){
-            return $this->respondToSlack('No pending games found between '.$firstParticipant->name.' and '.$secondParticipant->name);
+        });
+
+        if(empty($filteredGames)){
+            return $this->respondToSlack('No games found between '.$firstParticipant->name.' and '.$secondParticipant->name);
         }
 
-        return $this->respondToSlack(
-            'Round number: #'.$filteredGame['match']['round'].'\n'.
-            'Game #'.$filteredGame['match']['suggested_play_order'].'\n'
-            .$firstParticipant->name.' vs '.$secondParticipant->name);
+        $responseAttachments = [];
+        foreach ($filteredGames as $game){
+            $score = ['-', '-'];
+            $color = '#36a64f';
+            if ($game['match']['state'] == 'complete'){
+                $score = explode('-',$game['match']['scores_csv']);
+                $color = '#4169E1';
+            }
+
+            $player1 = $game['match']['player1_id'] == $firstParticipant->challonge_id ? $firstParticipant->name : $secondParticipant->name;
+            $player2 = $game['match']['player2_id'] == $secondParticipant->challonge_id ? $secondParticipant->name : $firstParticipant->name;
+            $responseAttachments[] = Attachment::create()
+                ->setText("Round ".$game['match']['round']." Game ".$game['match']['suggested_play_order'])
+                ->setColor($color)
+                ->setFields([
+                    AttachmentField::create($player1, $score[0])->displaySideBySide(),
+                    AttachmentField::create($player2, $score[1])->displaySideBySide()
+                ]);
+        }
+
+        return $this->respondToSlack($firstParticipant->name.' vs '.$secondParticipant->name)
+            ->withAttachments($responseAttachments);
 
     }
 }
