@@ -30,7 +30,7 @@ class FindPendingPlayersGame extends BaseHandler
 
     public function getParticipant($searchTerm)
     {
-        if (!isset($searchTerm)){
+        if (empty($searchTerm)){
             return 'Missing participant name';
         }
 
@@ -53,7 +53,7 @@ class FindPendingPlayersGame extends BaseHandler
         $matches = null;
         preg_match('/(find game) (\w+) *(.+)?$/', $request->text, $matches);
 
-        $result = $this->getParticipant($matches[2]);
+        $result = $this->getParticipant(array_get($matches, 2, ''));
         if (!$result instanceof Participant){
             return $this->respondToSlack($result)
                 ->withAttachment(Attachment::create()
@@ -61,7 +61,7 @@ class FindPendingPlayersGame extends BaseHandler
         }
         $firstParticipant = $result;
 
-        $result = $this->getParticipant($matches[3]);
+        $result = $this->getParticipant(array_get($matches, 3, ''));
         if (!$result instanceof Participant){
             return $this->respondToSlack($result)
                 ->withAttachment(Attachment::create()
